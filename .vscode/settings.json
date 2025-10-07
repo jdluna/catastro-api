@@ -1,0 +1,9 @@
+{
+    "java.project.sourcePaths": [
+        "catastro-api/src/main/java"
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.project.referencedLibraries": [
+        "catastro-api/target/dependency/*.jar"
+    ]
+}

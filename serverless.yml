@@ -1,0 +1,264 @@
+service: catastro-municipal-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: java21
+  architecture: x86_64
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 1024
+  timeout: 30
+  
+  # VARIABLE IAM ROLE - Modifica este valor con tu ARN de IAM Role
+  # Formato: arn:aws:iam::{ACCOUNT_ID}:role/{ROLE_NAME}
+  iam:
+    role: arn:aws:iam::123456789012:role/lambda-catastro-execution-role
+  
+  environment:
+    QUARKUS_PROFILE: prod
+    JAVA_TOOL_OPTIONS: >-
+      -XX:+TieredCompilation 
+      -XX:TieredStopAtLevel=1
+      -Djava.awt.headless=true
+      -Dquarkus.http.io-threads=2
+      -Dquarkus.vertx.worker-pool-size=4
+    DB_HOST: ${env:DB_HOST}
+    DB_PORT: ${env:DB_PORT, '5432'}
+    DB_NAME: ${env:DB_NAME, 'catastro_db'}
+    DB_USER: ${env:DB_USER}
+    DB_PASSWORD: ${env:DB_PASSWORD}
+    S3_BUCKET_FOTOS: ${env:S3_BUCKET_FOTOS, 'catastro-fotos-${self:provider.stage}'}
+    AWS_XRAY_TRACING_NAME: catastro-api
+
+  tracing:
+    lambda: true
+    apiGateway: true
+
+  logs:
+    restApi:
+      level: INFO
+      executionLogging: true
+      fullExecutionData: true
+
+  vpc:
+    securityGroupIds:
+      - ${env:SECURITY_GROUP_ID}
+    subnetIds:
+      - ${env:SUBNET_ID_1}
+      - ${env:SUBNET_ID_2}
+
+package:
+  artifact: target/function.zip
+  individually: false
+
+functions:
+  # ==================== ESTIMACION CRUD ====================
+  createEstimacion:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/estimacion
+          method: post
+          cors: true
+    provisionedConcurrency: 2
+
+  getEstimacion:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/estimacion/{id}
+          method: get
+          cors: true
+    provisionedConcurrency: 1
+
+  listEstimaciones:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/estimacion
+          method: get
+          cors: true
+    provisionedConcurrency: 1
+
+  updateEstimacion:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/estimacion/{id}
+          method: put
+          cors: true
+
+  deleteEstimacion:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/estimacion/{id}
+          method: delete
+          cors: true
+
+  # ==================== FOTO CRUD ====================
+  createFoto:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/foto
+          method: post
+          cors: true
+
+  getFoto:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/foto/{id}
+          method: get
+          cors: true
+
+  listFotos:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/foto
+          method: get
+          cors: true
+
+  updateFoto:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/foto/{id}
+          method: put
+          cors: true
+
+  deleteFoto:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/foto/{id}
+          method: delete
+          cors: true
+
+  # ==================== FICHA CATASTRAL CRUD ====================
+  createFichaCatastral:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    memorySize: 2048
+    timeout: 60
+    events:
+      - http:
+          path: /api/ficha-catastral
+          method: post
+          cors: true
+
+  getFichaCatastral:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/ficha-catastral/{id}
+          method: get
+          cors: true
+    provisionedConcurrency: 1
+
+  listFichasCatastrales:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/ficha-catastral
+          method: get
+          cors: true
+
+  updateFichaCatastral:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    memorySize: 2048
+    events:
+      - http:
+          path: /api/ficha-catastral/{id}
+          method: put
+          cors: true
+
+  deleteFichaCatastral:
+    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
+    snapStart: true
+    events:
+      - http:
+          path: /api/ficha-catastral/{id}
+          method: delete
+          cors: true
+
+resources:
+  Resources:
+    # S3 Bucket para almacenar fotos
+    CatastroFotosBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: catastro-fotos-${self:provider.stage}
+        VersioningConfiguration:
+          Status: Enabled
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteOldVersions
+              Status: Enabled
+              NoncurrentVersionExpirationInDays: 30
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+              AllowedHeaders:
+                - '*'
+
+    # RDS PostgreSQL Instance
+    CatastroRDSInstance:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        DBInstanceIdentifier: catastro-db-${self:provider.stage}
+        DBInstanceClass: db.t4g.micro
+        Engine: postgres
+        EngineVersion: '16.1'
+        MasterUsername: ${env:DB_USER}
+        MasterUserPassword: ${env:DB_PASSWORD}
+        AllocatedStorage: 20
+        MaxAllocatedStorage: 100
+        StorageType: gp3
+        StorageEncrypted: true
+        BackupRetentionPeriod: 7
+        PreferredBackupWindow: 03:00-04:00
+        PreferredMaintenanceWindow: sun:04:00-sun:05:00
+        MultiAZ: false
+        PubliclyAccessible: false
+        VPCSecurityGroups:
+          - ${env:SECURITY_GROUP_ID}
+        DBSubnetGroupName: ${env:DB_SUBNET_GROUP}
+        EnablePerformanceInsights: true
+        PerformanceInsightsRetentionPeriod: 7
+
+plugins:
+  - serverless-plugin-snapstart
+  - serverless-prune-plugin
+
+custom:
+  prune:
+    automatic: true
+    number: 3
