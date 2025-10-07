@@ -1,151 +1,142 @@
 package com.municipalidad.catastro.service;
 
-import com.municipalidad.catastro.model.Foto;
+import com.municipalidad.catastro.domain.Foto;
+import com.municipalidad.catastro.dto.ApiResponse;
+import com.municipalidad.catastro.dto.FotoDTO;
 import com.municipalidad.catastro.repository.FotoRepository;
+import com.municipalidad.catastro.repository.LoteRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-
+import jakarta.transaction.Transactional;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.UnaryOperator;
 
 @ApplicationScoped
 public class FotoService {
 
     @Inject
-    FotoRepository repository;
+    FotoRepository fotoRepository;
 
     @Inject
-    S3Client s3Client;
+    LoteRepository loteRepository;
 
-    private static final String BUCKET_NAME = System.getenv().getOrDefault("S3_BUCKET_PHOTOS", "catastro-photos");
-
-    /**
-     * Creates a new foto with S3 upload if needed
-     */
-    public Foto create(Foto foto) {
-        return Optional.ofNullable(foto)
-                .map(uploadToS3IfNeeded())
-                .map(repository::save)
-                .orElseThrow(() -> new IllegalArgumentException("Foto cannot be null"));
-    }
-
-    /**
-     * Retrieves a foto by ID
-     */
-    public Optional<Foto> getById(Integer id) {
-        return repository.findById(id);
-    }
-
-    /**
-     * Retrieves all fotos
-     */
-    public List<Foto> getAll() {
-        return repository.findAll();
-    }
-
-    /**
-     * Retrieves fotos by codigo lote
-     */
-    public List<Foto> getByCodigoLote(String codigoLote) {
-        if (codigoLote == null || codigoLote.trim().isEmpty()) {
-            throw new IllegalArgumentException("Codigo lote cannot be null or empty");
-        }
-        if (!codigoLote.matches("^\\d{8}$")) {
-            throw new IllegalArgumentException("Codigo lote must be exactly 8 digits");
-        }
-        return repository.findByCodigoLote(codigoLote);
-    }
-
-    /**
-     * Updates an existing foto with S3 upload if needed
-     */
-    public Foto update(Integer id, Foto foto) {
-        return repository.findById(id)
-                .map(existing -> uploadToS3IfNeeded().apply(foto))
-                .map(updated -> repository.update(id, updated))
-                .orElseThrow(() -> new IllegalArgumentException("Foto not found with id: " + id));
-    }
-
-    /**
-     * Deletes a foto by ID and removes from S3 if applicable
-     */
-    public boolean delete(Integer id) {
-        return repository.findById(id)
-                .map(foto -> {
-                    deleteFromS3IfNeeded(foto);
-                    return repository.delete(id);
+    @Transactional
+    public ApiResponse<FotoDTO> create(FotoDTO dto) {
+        return loteRepository.findByCodigoLote(dto.codigoLote())
+                .map(lote -> {
+                    var foto = mapToEntity(dto);
+                    foto.lote = lote;
+                    fotoRepository.persist(foto);
+                    lote.addFoto(foto);
+                    return ApiResponse.created("Foto registrada exitosamente", mapToDTO(foto));
                 })
-                .orElse(false);
+                .orElse(ApiResponse.error("Lote no encontrado con código: " + dto.codigoLote()));
     }
 
-    // Functional helper methods
-
-    private UnaryOperator<Foto> uploadToS3IfNeeded() {
-        return foto -> {
-            if (shouldUploadToS3(foto)) {
-                String s3Key = generateS3Key(foto);
-                performS3Upload(s3Key, foto.url());
-                String s3Url = buildS3Url(s3Key);
-                return foto.withUrl(s3Url);
-            }
-            return foto;
-        };
+    public ApiResponse<FotoDTO> findById(Long id) {
+        return fotoRepository.findByIdOptional(id)
+                .map(this::mapToDTO)
+                .map(ApiResponse::success)
+                .orElse(ApiResponse.notFound("Foto no encontrada con ID: " + id));
     }
 
-    private boolean shouldUploadToS3(Foto foto) {
-        return foto.url() != null
-                && !foto.url().trim().isEmpty()
-                && !foto.url().startsWith("http");
+    @Transactional
+    public ApiResponse<Void> delete(Long id) {
+        return fotoRepository.findByIdOptional(id)
+                .map(foto -> {
+                    //delete de S3
+                    fotoRepository.delete(foto);
+                    return ApiResponse.<Void>success("Foto eliminada exitosamente", null);
+                })
+                .orElse(ApiResponse.notFound("Foto no encontrada con ID: " + id));
     }
 
-    private String generateS3Key(Foto foto) {
-        return String.format("lotes/%s/%s_%d.jpg",
-                foto.codigoLote(),
-                Optional.ofNullable(foto.tipoTerreno()).orElse("general"),
-                System.currentTimeMillis());
+    public ApiResponse<List<FotoDTO>> findByLoteId(Long loteId) {
+        var fotos = fotoRepository.findByLoteId(loteId).stream()
+                .map(this::mapToDTO)
+                .toList();
+        return ApiResponse.success(fotos);
     }
 
-    private void performS3Upload(String key, String content) {
-        try {
-            PutObjectRequest putRequest = PutObjectRequest.builder()
-                    .bucket(BUCKET_NAME)
-                    .key(key)
-                    .contentType("image/jpeg")
-                    .build();
-
-            s3Client.putObject(putRequest, RequestBody.fromString(content));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to upload to S3: " + e.getMessage(), e);
-        }
+    public ApiResponse<List<FotoDTO>> findByCodigoLote(String codigoLote) {
+        var fotos = fotoRepository.findByCodigoLote(codigoLote).stream()
+                .map(this::mapToDTO)
+                .toList();
+        return ApiResponse.success(fotos);
     }
 
-    private String buildS3Url(String key) {
-        return String.format("https://%s.s3.amazonaws.com/%s", BUCKET_NAME, key);
+    public ApiResponse<List<FotoDTO>> findByTipoFoto(String tipoFoto) {
+        var fotos = fotoRepository.findByTipoFoto(tipoFoto).stream()
+                .map(this::mapToDTO)
+                .toList();
+        return ApiResponse.success(fotos);
     }
 
-    private void deleteFromS3IfNeeded(Foto foto) {
-        if (foto.url() != null && foto.url().contains(BUCKET_NAME)) {
-            try {
-                String key = extractS3Key(foto.url());
-                DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
-                        .bucket(BUCKET_NAME)
-                        .key(key)
-                        .build();
-                s3Client.deleteObject(deleteRequest);
-            } catch (Exception e) {
-                // Log error but don't fail the delete operation
-                System.err.println("Warning: Failed to delete from S3: " + e.getMessage());
-            }
-        }
+    /*
+    @Transactional
+    public ApiResponse<FotoDTO> uploadToS3(String codigoLote, byte[] fileData,
+                                           String fileName, String contentType) {
+        return loteRepository.findByCodigoLote(codigoLote)
+                .map(lote -> {
+                    var s3Key = "lote_" + codigoLote + "/" + fileName;
+                    var url = s3Util.uploadFile(s3Key, fileData);
+
+                    var foto = new Foto();
+                    foto.lote = lote;
+                    foto.codigoLote = codigoLote;
+                    foto.nombre = fileName;
+                    foto.url = url;
+                    foto.servicio = "S3";
+                    foto.contentType = contentType;
+                    foto.tamanioBytes = (long) fileData.length;
+
+                    fotoRepository.persist(foto);
+                    lote.addFoto(foto);
+
+                    return ApiResponse.created("Archivo subido exitosamente", mapToDTO(foto));
+                })
+                .orElse(ApiResponse.error("Lote no encontrado con código: " + codigoLote));
     }
 
-    private String extractS3Key(String url) {
-        int keyStartIndex = url.indexOf(".com/") + 5;
-        return keyStartIndex > 4 ? url.substring(keyStartIndex) : "";
+    public ApiResponse<byte[]> downloadFromS3(Long id) {
+        return fotoRepository.findByIdOptional(id)
+                .map(foto -> {
+                    try {
+                        var fileData = s3Util.getFile(foto.nombre);
+                        return ApiResponse.success("Archivo descargado exitosamente", fileData);
+                    } catch (Exception e) {
+                        return ApiResponse.<byte[]>error("Error descargando archivo: " + e.getMessage());
+                    }
+                })
+                .orElse(ApiResponse.notFound("Foto no encontrada con ID: " + id));
+    }
+
+     */
+
+    private Foto mapToEntity(FotoDTO dto) {
+        var f = new Foto();
+        f.codigoLote = dto.codigoLote();
+        f.servicio = dto.servicio() != null ? dto.servicio() : "S3";
+        f.nombre = dto.nombre();
+        f.url = dto.url();
+        f.tipoTerreno = dto.tipoTerreno();
+        f.tipoFoto = dto.tipoFoto();
+        f.contentType = dto.contentType();
+        f.tamanioBytes = dto.tamanioBytes();
+        return f;
+    }
+
+    private FotoDTO mapToDTO(Foto e) {
+        return new FotoDTO(
+                e.id,
+                e.lote != null ? e.lote.id : null,
+                e.codigoLote,
+                e.servicio,
+                e.nombre,
+                e.url,
+                e.tipoTerreno,
+                e.tipoFoto,
+                e.contentType,
+                e.tamanioBytes
+        );
     }
 }

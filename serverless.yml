@@ -7,7 +7,6 @@ provider:
   runtime: java21
   architecture: x86_64
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'us-east-1'}
   memorySize: 1024
   timeout: 30
   
@@ -29,7 +28,6 @@ provider:
     DB_NAME: ${env:DB_NAME, 'catastro_db'}
     DB_USER: ${env:DB_USER}
     DB_PASSWORD: ${env:DB_PASSWORD}
-    S3_BUCKET_FOTOS: ${env:S3_BUCKET_FOTOS, 'catastro-fotos-${self:provider.stage}'}
     AWS_XRAY_TRACING_NAME: catastro-api
 
   tracing:
@@ -55,180 +53,69 @@ package:
 
 functions:
   # ==================== ESTIMACION CRUD ====================
-  createEstimacion:
+  loteApi:
     handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
     snapStart: true
     events:
       - http:
-          path: /api/estimacion
+          path: /api/lotes
           method: post
-          cors: true
-    provisionedConcurrency: 2
-
-  getEstimacion:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/estimacion/{id}
+          path: /api/lotes/{id}
           method: get
-          cors: true
-    provisionedConcurrency: 1
-
-  listEstimaciones:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/estimacion
-          method: get
-          cors: true
-    provisionedConcurrency: 1
-
-  updateEstimacion:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
-      - http:
-          path: /api/estimacion/{id}
+          path: /api/lotes/{id}
           method: put
-          cors: true
-
-  deleteEstimacion:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/estimacion/{id}
+          path: /api/lotes/{id}
           method: delete
-          cors: true
+      - http:
+          path: /api/lotes
+          method: get
 
-  # ==================== FOTO CRUD ====================
-  createFoto:
+  estimacionApi:
     handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
     snapStart: true
     events:
       - http:
-          path: /api/foto
+          path: /api/estimaciones
           method: post
-          cors: true
-
-  getFoto:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/foto/{id}
+          path: /api/estimaciones/{id}
           method: get
-          cors: true
-
-  listFotos:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/foto
-          method: get
-          cors: true
-
-  updateFoto:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
-      - http:
-          path: /api/foto/{id}
+          path: /api/estimaciones/{id}
           method: put
-          cors: true
-
-  deleteFoto:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/foto/{id}
+          path: /api/estimaciones/{id}
           method: delete
-          cors: true
+      - http:
+          path: /api/estimaciones/lote/{loteId}
+          method: get
 
   # ==================== FICHA CATASTRAL CRUD ====================
-  createFichaCatastral:
+  fichaCatastralApi:
     handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
     snapStart: true
-    memorySize: 2048
-    timeout: 60
     events:
       - http:
-          path: /api/ficha-catastral
+          path: /api/fichas
           method: post
-          cors: true
-
-  getFichaCatastral:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/ficha-catastral/{id}
+          path: /api/fichas/{id}
           method: get
-          cors: true
-    provisionedConcurrency: 1
-
-  listFichasCatastrales:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/ficha-catastral
-          method: get
-          cors: true
-
-  updateFichaCatastral:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    memorySize: 2048
-    events:
-      - http:
-          path: /api/ficha-catastral/{id}
+          path: /api/fichas/{id}
           method: put
-          cors: true
-
-  deleteFichaCatastral:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
       - http:
-          path: /api/ficha-catastral/{id}
+          path: /api/fichas/{id}
           method: delete
-          cors: true
+      - http:
+          path: /api/fichas/lote/{codigoLote}
+          method: get
 
 resources:
   Resources:
-    # S3 Bucket para almacenar fotos
-    CatastroFotosBucket:
-      Type: AWS::S3::Bucket
-      Properties:
-        BucketName: catastro-fotos-${self:provider.stage}
-        VersioningConfiguration:
-          Status: Enabled
-        PublicAccessBlockConfiguration:
-          BlockPublicAcls: true
-          BlockPublicPolicy: true
-          IgnorePublicAcls: true
-          RestrictPublicBuckets: true
-        LifecycleConfiguration:
-          Rules:
-            - Id: DeleteOldVersions
-              Status: Enabled
-              NoncurrentVersionExpirationInDays: 30
-        CorsConfiguration:
-          CorsRules:
-            - AllowedOrigins:
-                - '*'
-              AllowedMethods:
-                - GET
-                - PUT
-                - POST
-              AllowedHeaders:
-                - '*'
-
     # RDS PostgreSQL Instance
     CatastroRDSInstance:
       Type: AWS::RDS::DBInstance
