@@ -13,7 +13,7 @@ provider:
   # VARIABLE IAM ROLE - Modifica este valor con tu ARN de IAM Role
   # Formato: arn:aws:iam::{ACCOUNT_ID}:role/{ROLE_NAME}
   iam:
-    role: arn:aws:iam::123456789012:role/lambda-catastro-execution-role
+    role: arn:aws:iam::946503249480:role/LabRole
   
   environment:
     QUARKUS_PROFILE: prod
