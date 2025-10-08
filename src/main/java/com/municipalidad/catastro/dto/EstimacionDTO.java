@@ -4,11 +4,6 @@ import jakarta.validation.constraints.*;
 
 public record EstimacionDTO(
         Long id,
-        Long loteId,
-
-        @NotBlank(message = "El código del lote es requerido")
-        @Pattern(regexp = "^\\d{8}$", message = "El código del lote debe tener exactamente 8 dígitos")
-        String codigoLote,
 
         @Min(value = 0, message = "El número de unidades catastrales debe ser mayor o igual a 0")
         Integer numUnidadesCatastrales,

@@ -53,26 +53,6 @@ package:
 
 functions:
   # ==================== ESTIMACION CRUD ====================
-  loteApi:
-    handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
-    snapStart: true
-    events:
-      - http:
-          path: /api/lotes
-          method: post
-      - http:
-          path: /api/lotes/{id}
-          method: get
-      - http:
-          path: /api/lotes/{id}
-          method: put
-      - http:
-          path: /api/lotes/{id}
-          method: delete
-      - http:
-          path: /api/lotes
-          method: get
-
   estimacionApi:
     handler: io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest
     snapStart: true

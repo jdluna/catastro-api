@@ -1,25 +1,6 @@
--- Tabla Lote (información geográfica)
-CREATE TABLE IF NOT EXISTS lote (
-    id SERIAL PRIMARY KEY,
-    codigo_sector VARCHAR(2) NOT NULL,
-    codigo_manzana VARCHAR(3) NOT NULL,
-    codigo_lote VARCHAR(8) UNIQUE NOT NULL,
-    latitud DECIMAL(10, 8),
-    longitud DECIMAL(11, 8),
-    precision_metros DECIMAL(5, 2),
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_codigo_lote_formato CHECK (codigo_lote ~ '^\d{8}$')
-);
-
 -- Tabla Estimación (Pantallas 1-4)
 CREATE TABLE IF NOT EXISTS estimacion (
     id SERIAL PRIMARY KEY,
-    lote_id INTEGER REFERENCES lote(id) ON DELETE CASCADE,
-    codigo_lote CHAR(8) NOT NULL,
-    num_unidades_catastrales INTEGER DEFAULT 0,
-    tipo_terreno VARCHAR(20),
-    num_pisos INTEGER DEFAULT 0,
     num_viviendas INTEGER DEFAULT 0,
     num_comercios INTEGER DEFAULT 0,
     num_industrias INTEGER DEFAULT 0,
@@ -27,27 +8,8 @@ CREATE TABLE IF NOT EXISTS estimacion (
     num_salud INTEGER DEFAULT 0,
     num_religion INTEGER DEFAULT 0,
     num_estacionamientos INTEGER DEFAULT 0,
-    num_medidores_luz INTEGER DEFAULT 0,
-    num_medidores_agua INTEGER DEFAULT 0,
-    num_timbres INTEGER DEFAULT 0,
-    num_sin_servicio INTEGER DEFAULT 0,
-    observacion VARCHAR(250),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_codigo_lote_formato CHECK (codigo_lote ~ '^\d{8}$')
-);
-
--- Tabla Foto
-CREATE TABLE IF NOT EXISTS foto (
-    id SERIAL PRIMARY KEY,
-    lote_id INTEGER REFERENCES lote(id) ON DELETE CASCADE,
-    codigo_lote CHAR(8) NOT NULL,
-    servicio VARCHAR(20) DEFAULT 'S3',
-    nombre VARCHAR(100) NOT NULL,
-    url VARCHAR(255) NOT NULL,
-    tipo_terreno VARCHAR(20),
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_codigo_lote_formato CHECK (codigo_lote ~ '^\d{8}$')
+    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabla Ficha Catastral (Etapa 2)
@@ -74,8 +36,7 @@ CREATE TABLE IF NOT EXISTS ficha_catastral (
     fecha_levantamiento DATE,
     observaciones TEXT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_codigo_lote_formato CHECK (codigo_lote ~ '^\d{8}$')
+    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabla Titular
@@ -132,11 +93,6 @@ CREATE TABLE IF NOT EXISTS servicio (
 );
 
 -- Índices para optimización
-CREATE INDEX idx_lote_codigo ON lote(codigo_lote);
-CREATE INDEX idx_estimacion_lote ON estimacion(lote_id);
-CREATE INDEX idx_estimacion_codigo ON estimacion(codigo_lote);
-CREATE INDEX idx_foto_lote ON foto(lote_id);
-CREATE INDEX idx_ficha_codigo ON ficha_catastral(codigo_lote);
 CREATE INDEX idx_titular_ficha ON titular(ficha_id);
 CREATE INDEX idx_construccion_ficha ON construccion(ficha_id);
 CREATE INDEX idx_servicio_ficha ON servicio(ficha_id);

@@ -10,11 +10,6 @@ import java.time.LocalDateTime;
         @Index(name = "idx_estimacion_codigo", columnList = "codigo_lote")
 })
 public class Estimacion extends PanacheEntity {
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "lote_id")
-    public Lote lote;
-
     @Column(name = "codigo_lote", nullable = false, length = 8)
     public String codigoLote;
 

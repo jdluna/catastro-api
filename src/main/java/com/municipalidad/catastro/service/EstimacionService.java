@@ -4,7 +4,6 @@ import com.municipalidad.catastro.domain.Estimacion;
 import com.municipalidad.catastro.dto.ApiResponse;
 import com.municipalidad.catastro.dto.EstimacionDTO;
 import com.municipalidad.catastro.repository.EstimacionRepository;
-import com.municipalidad.catastro.repository.LoteRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -17,27 +16,18 @@ public class EstimacionService {
     @Inject
     EstimacionRepository estimacionRepository;
 
-    @Inject
-    LoteRepository loteRepository;
-
     @Transactional
     public ApiResponse<EstimacionDTO> create(EstimacionDTO dto) {
-        return loteRepository.findByCodigoLote(dto.codigoLote())
-                .map(lote -> {
-                    var estimacion = mapToEntity(dto);
-                    estimacion.lote = lote;
+        var estimacion = mapToEntity(dto);
 
-                    // Calcular total de unidades catastrales si no fue proporcionado
-                    if (estimacion.numUnidadesCatastrales == null || estimacion.numUnidadesCatastrales == 0) {
-                        estimacion.numUnidadesCatastrales = estimacion.calcularTotalUnidades();
-                    }
+        // Calcular total de unidades catastrales si no fue proporcionado
+        if (estimacion.numUnidadesCatastrales == null || estimacion.numUnidadesCatastrales == 0) {
+            estimacion.numUnidadesCatastrales = estimacion.calcularTotalUnidades();
+        }
 
-                    estimacionRepository.persist(estimacion);
-                    lote.addEstimacion(estimacion);
+        estimacionRepository.persist(estimacion);
 
-                    return ApiResponse.created("Estimación creada exitosamente", mapToDTO(estimacion));
-                })
-                .orElse(ApiResponse.error("Lote no encontrado con código: " + dto.codigoLote()));
+        return ApiResponse.created("Estimación creada exitosamente", mapToDTO(estimacion));
     }
 
     public ApiResponse<EstimacionDTO> findById(Long id) {
@@ -97,7 +87,6 @@ public class EstimacionService {
 
     private Estimacion mapToEntity(EstimacionDTO dto) {
         var e = new Estimacion();
-        e.codigoLote = dto.codigoLote();
         e.numUnidadesCatastrales = dto.numUnidadesCatastrales() != null ? dto.numUnidadesCatastrales() : 0;
         e.tipoTerreno = dto.tipoTerreno();
         e.numPisos = dto.numPisos() != null ? dto.numPisos() : 0;
@@ -119,8 +108,6 @@ public class EstimacionService {
     private EstimacionDTO mapToDTO(Estimacion e) {
         return new EstimacionDTO(
                 e.id,
-                e.lote != null ? e.lote.id : null,
-                e.codigoLote,
                 e.numUnidadesCatastrales,
                 e.tipoTerreno,
                 e.numPisos,
